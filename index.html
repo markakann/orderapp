@@ -291,8 +291,16 @@ function OrderApp() {
     setPendingQty(1);
   };
   const handleClickOrderToEdit = (order) => {
-    if (order.itemRef?.noCustomize) {
-      setSelectedOrderId(selectedOrderId === order.id ? null : order.id);
+    if (order.itemRef?.noCustomize && !order.itemRef?.discount) {
+      if (selectedOrderId === order.id && mode === "customize_edit") {
+        setSelectedOrderId(null); setMode("browse"); return;
+      }
+      setSelectedOrderId(order.id);
+      setEditingId(order.id);
+      setPendingItem({ ...order.itemRef, category: order.category });
+      setPendingConfig(defaultConfig());
+      setPendingQty(order.qty);
+      setMode("customize_edit");
       return;
     }
     if (selectedOrderId===order.id&&mode==="customize_edit") { setSelectedOrderId(null); setMode("browse"); return; }
@@ -303,8 +311,12 @@ function OrderApp() {
     setMode("customize_edit");
   };
   const handleSaveEdit = () => {
-    const unitTotal=calcUnitTotal(pendingItem,pendingConfig);
-    setOrders(p=>p.map(o=>o.id===editingId?{...o,sugar:pendingConfig.sugar,ice:pendingConfig.ice,toppings:[...pendingConfig.toppings],doubleTopping:pendingConfig.doubleTopping,extraOption:pendingConfig.extraOption,unitTotal,qty:pendingQty}:o));
+    if (pendingItem.noCustomize) {
+      setOrders(p=>p.map(o=>o.id===editingId?{...o,qty:pendingQty}:o));
+    } else {
+      const unitTotal=calcUnitTotal(pendingItem,pendingConfig);
+      setOrders(p=>p.map(o=>o.id===editingId?{...o,sugar:pendingConfig.sugar,ice:pendingConfig.ice,toppings:[...pendingConfig.toppings],doubleTopping:pendingConfig.doubleTopping,extraOption:pendingConfig.extraOption,unitTotal,qty:pendingQty}:o));
+    }
     setMode("browse"); setEditingId(null); setPendingItem(null); setPendingConfig(defaultConfig()); setPendingQty(1);
   };
   const handleCancelEdit = () => { setMode("browse"); setEditingId(null); setPendingItem(null); setPendingConfig(defaultConfig()); setPendingQty(1); setSelectedOrderId(null); };
@@ -329,7 +341,7 @@ function OrderApp() {
   const iceOptions = pendingItem?ICE[pendingItem.ice]:[];
   const toppingLimit = pendingItem?.toppingLimit||2;
 
-  const C = { bg:"#F7F4EF",surface:"#FFF",border:"#E2DDD6",accent:"#3D6B4F",accentLight:"#E8F2EC",accentText:"#2A4D38",text:"#1A1A1A",muted:"#8A8078",selected:"#D4EAD9",selectedBorder:"#3D6B4F",danger:"#B83232",dangerLight:"#FDEAEA",disabled:"#D0CBC4",disabledText:"#B0AAA4" };
+  const C = { bg:"#F7F4EF",surface:"#FFF",border:"#E2DDD6",accent:"#003e52",accentLight:"#e6f0f3",accentText:"#bc955c",text:"#1A1A1A",muted:"#8A8078",selected:"#cce0e6",selectedBorder:"#003e52",danger:"#B83232",dangerLight:"#FDEAEA",disabled:"#D0CBC4",disabledText:"#B0AAA4" };
   const pill = (active,disabled) => ({ padding:"7px 14px",borderRadius:20,cursor:disabled?"not-allowed":"pointer",fontSize:13,fontWeight:600,border:`1.5px solid ${disabled?C.disabled:active?C.accent:C.border}`,background:disabled?"#F0EDE9":active?C.accent:C.surface,color:disabled?C.disabledText:active?"#fff":C.text,opacity:disabled?0.6:1 });
   const chip = (active) => ({ display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 6px",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,gap:2,border:`1.5px solid ${active?C.accent:C.border}`,background:active?C.accentLight:C.surface,color:active?C.accentText:C.text });
 
@@ -364,7 +376,7 @@ function OrderApp() {
   return (
     <div style={{ height:"100vh",display:"flex",flexDirection:"column",fontFamily:"'PingFang TC','Noto Sans TC',sans-serif",color:C.text,background:C.bg,overflow:"hidden" }}>
       <div style={{ background:C.accent,color:"#fff",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
-        <span style={{ fontSize:17,fontWeight:700,letterSpacing:2 }}>🧃 點餐系統</span>
+        <span style={{ fontSize:17,fontWeight:700,letterSpacing:2 }}>點餐系統</span>
         <div style={{ textAlign:"right" }}>
           <div style={{ fontSize:10,opacity:0.75,letterSpacing:1 }}>目前金額</div>
           <div style={{ fontSize:20,fontWeight:700 }}>NT$ {total}</div>
@@ -403,11 +415,28 @@ function OrderApp() {
             <div style={{ flex:1,padding:"16px 18px",overflowY:"auto",display:"flex",flexDirection:"column",gap:16 }}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
                 <div>
-                  <div style={{ fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:3 }}>{mode==="customize_edit"?"✏️ 修改品項":"➕ 新增品項"}</div>
+                  <div style={{ fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:3 }}>{pendingItem.noCustomize?"📦 更改數量":mode==="customize_edit"?"✏️ 修改品項":"➕ 新增品項"}</div>
                   <div style={{ fontSize:18,fontWeight:700,color:C.accentText }}>{pendingItem.name}</div>
                 </div>
                 <button onClick={handleCancelEdit} style={{ padding:"6px 12px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",fontSize:12,color:C.muted }}>取消</button>
               </div>
+              {/* 袋子：只顯示數量，其餘全跳過 */}
+              {pendingItem.noCustomize&&(
+                <>
+                  <div style={{ borderTop:`1px solid ${C.border}`,paddingTop:12 }}>
+                    <div style={{ fontSize:11,fontWeight:700,color:C.muted,letterSpacing:1,marginBottom:8 }}>數量</div>
+                    <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                      <button onClick={()=>setPendingQty(q=>Math.max(1,q-1))} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accent,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>−</button>
+                      <input type="number" min="1" value={pendingQty} onFocus={e=>e.target.select()} onChange={e=>{ const v=parseInt(e.target.value); if(!isNaN(v)&&v>=1)setPendingQty(v); }} style={{ width:52,textAlign:"center",fontSize:16,fontWeight:700,border:`1.5px solid ${C.border}`,borderRadius:8,padding:"6px 0",outline:"none",color:C.text }} />
+                      <button onClick={()=>setPendingQty(q=>q+1)} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accent,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>＋</button>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex",justifyContent:"flex-end",borderTop:`1px solid ${C.border}`,paddingTop:14,marginTop:"auto" }}>
+                    <button onClick={handleSaveEdit} style={{ padding:"11px 24px",background:"#bc955c",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>儲存修改</button>
+                  </div>
+                </>
+              )}
+              {!pendingItem.noCustomize&&<>
               {/* 冰塊 */}
               <div>
                 <div style={{ fontSize:11,fontWeight:700,color:C.muted,letterSpacing:1,marginBottom:7 }}>冰塊</div>
@@ -475,9 +504,10 @@ function OrderApp() {
                 </div>
                 {mode==="customize_new"
                   ? <button onClick={handleAddOrder} style={{ padding:"11px 24px",background:C.accent,color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>加入點單</button>
-                  : <button onClick={handleSaveEdit} style={{ padding:"11px 24px",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>儲存修改</button>
+                  : <button onClick={handleSaveEdit} style={{ padding:"11px 24px",background:"#bc955c",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>儲存修改</button>
                 }
               </div>
+            </>}
             </div>
           )}
         </div>
@@ -497,21 +527,17 @@ function OrderApp() {
               const isSel=selectedOrderId===o.id;
               return (
                 <div key={o.id} onClick={()=>handleClickOrderToEdit(o)}
-                  style={{ padding:"9px 10px",border:`1.5px solid ${isSel?C.selectedBorder:C.border}`,borderRadius:10,cursor:o.itemRef?.noCustomize?"default":"pointer",background:isSel?C.selected:C.bg }}>
+                  style={{ padding:"9px 10px",border:`1.5px solid ${isSel?C.selectedBorder:C.border}`,borderRadius:10,cursor:"pointer",background:isSel?C.selected:C.bg }}>
                   <div style={{ display:"flex",alignItems:"flex-start",gap:7 }}>
                     <span style={{ background:isSel?C.accent:C.muted,color:"#fff",borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0,marginTop:1 }}>{i+1}</span>
                     <div style={{ flex:1,minWidth:0 }}>
                       <div style={{ fontWeight:700,fontSize:13 }}>{o.item}</div>
                       <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{orderSummaryLine(o)}</div>
                       {isSel&&!o.itemRef?.noCustomize&&<div style={{ fontSize:11,color:C.accent,marginTop:3,fontWeight:600 }}>← 點左側可修改內容</div>}
-                      {isSel&&o.itemRef?.noCustomize&&(
-                        <div onClick={e=>e.stopPropagation()} style={{ marginTop:6 }}>
-                          <button onClick={()=>{ const v=prompt("請輸入數量",o.qty); const n=parseInt(v); if(!isNaN(n)&&n>=1) setOrders(p=>p.map(x=>x.id===o.id?{...x,qty:n}:x)); else if(!isNaN(n)&&n<=0) removeOrder(o.id); }}
-                            style={{ padding:"5px 12px",background:C.accentLight,color:C.accentText,border:`1.5px solid ${C.accent}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700 }}>
-                            更改數量
-                          </button>
-                        </div>
+                      {isSel&&o.itemRef?.noCustomize&&!o.itemRef?.discount&&(
+                        <div style={{ fontSize:11,color:C.accent,marginTop:3,fontWeight:600,whiteSpace:"nowrap" }}>← 點左側修改數量</div>
                       )}
+
                     </div>
                     <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0 }}>
                       <div onClick={e=>e.stopPropagation()} style={{ display:"flex",alignItems:"center",gap:4,background:isSel?C.accentLight:C.surface,border:`1.5px solid ${isSel?C.accent:C.border}`,borderRadius:20,padding:"2px 5px" }}>
@@ -612,7 +638,7 @@ function OrderApp() {
       {receipt&&(
         <div style={{ position:"fixed",inset:0,background:C.bg,display:"flex",flexDirection:"column",zIndex:300 }}>
           <div style={{ background:C.accent,color:"#fff",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
-            <span style={{ fontSize:17,fontWeight:700,letterSpacing:2 }}>🧃 點餐系統</span>
+            <span style={{ fontSize:17,fontWeight:700,letterSpacing:2 }}>點餐系統</span>
             <span style={{ fontSize:13,opacity:0.85 }}>訂單已送出</span>
           </div>
           <div style={{ flex:1,overflowY:"auto",padding:"20px 18px" }}>
