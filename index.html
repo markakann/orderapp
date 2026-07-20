@@ -297,7 +297,7 @@ function OrderApp() {
       }
       setSelectedOrderId(order.id);
       setEditingId(order.id);
-      setPendingItem({ ...order.itemRef, category: order.category });
+      setPendingItem({ ...order.itemRef, category: order.category, noCustomize: true });
       setPendingConfig(defaultConfig());
       setPendingQty(order.qty);
       setMode("customize_edit");
@@ -533,10 +533,8 @@ function OrderApp() {
                     <div style={{ flex:1,minWidth:0 }}>
                       <div style={{ fontWeight:700,fontSize:13 }}>{o.item}</div>
                       <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{orderSummaryLine(o)}</div>
-                      {isSel&&!o.itemRef?.noCustomize&&<div style={{ fontSize:11,color:C.accent,marginTop:3,fontWeight:600 }}>← 點左側可修改內容</div>}
-                      {isSel&&o.itemRef?.noCustomize&&!o.itemRef?.discount&&(
-                        <div style={{ fontSize:11,color:C.accent,marginTop:3,fontWeight:600,whiteSpace:"nowrap" }}>← 點左側修改數量</div>
-                      )}
+                      {isSel&&<div style={{ fontSize:11,color:C.accent,marginTop:3,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden" }}>← 點左側修改{o.itemRef?.noCustomize?"數量":"內容"}</div>}
+
 
                     </div>
                     <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0 }}>
