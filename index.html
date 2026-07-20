@@ -209,6 +209,7 @@ function OrderApp() {
     return item.price+toppingSum+doubleExtra+extra;
   };
   const getSugarOptions = (item,cfg) => {
+    if (!SWEETNESS[item.sugar]) return [];
     const base = [...SWEETNESS[item.sugar]];
     if (item.specialSugar==="yifen") {
       const iceQ = cfg.ice&&ICE_FOR_WARM_RULE.includes(cfg.ice);
@@ -337,8 +338,8 @@ function OrderApp() {
 
   const isCustomizing = mode==="customize_new"||mode==="customize_edit";
   const pendingUnitTotal = pendingItem?calcUnitTotal(pendingItem,pendingConfig):0;
-  const sugarOptions = pendingItem?getSugarOptions(pendingItem,pendingConfig):[];
-  const iceOptions = pendingItem?ICE[pendingItem.ice]:[];
+  const sugarOptions = pendingItem&&!pendingItem.noCustomize?getSugarOptions(pendingItem,pendingConfig):[];
+  const iceOptions = pendingItem&&!pendingItem.noCustomize?(ICE[pendingItem.ice]||[]):[];
   const toppingLimit = pendingItem?.toppingLimit||2;
 
   const C = { bg:"#F7F4EF",surface:"#FFF",border:"#E2DDD6",accent:"#003e52",accentLight:"#e6f0f3",accentText:"#bc955c",text:"#1A1A1A",muted:"#8A8078",selected:"#cce0e6",selectedBorder:"#003e52",danger:"#B83232",dangerLight:"#FDEAEA",disabled:"#D0CBC4",disabledText:"#B0AAA4" };
