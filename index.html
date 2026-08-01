@@ -12,7 +12,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState } = React;
+const { useState, useEffect } = React;
 
 const SWEETNESS = {
   1: ["正常糖","少糖","半糖","微糖","二分糖","一分糖","無糖"],
@@ -274,12 +274,16 @@ function OrderApp() {
     cfg.sugar=SWEETNESS[item.sugar][0];
     cfg.ice=ICE[item.ice][0];
     if (item.lockedTopping) cfg.toppings=[item.lockedTopping];
-    setPendingItem({...item,category});
+    const id=Date.now();
+    const unitTotal=calcUnitTotal(item,cfg);
+    const fullItem={...item,category};
+    setOrders(p=>[...p,{id,category,item:item.name,basePrice:item.price,sugar:cfg.sugar,ice:cfg.ice,toppings:[...cfg.toppings],doubleTopping:false,extraOption:false,unitTotal,qty:1,itemRef:fullItem}]);
+    setPendingItem(fullItem);
     setPendingConfig(cfg);
     setPendingQty(1);
-    setMode("customize_new");
-    setEditingId(null);
-    setSelectedOrderId(null);
+    setEditingId(id);
+    setSelectedOrderId(id);
+    setMode("customize_edit");
   };
   const handleAddOrder = () => {
     const id=Date.now();
@@ -335,6 +339,22 @@ function OrderApp() {
     }));
   };
   const clearAll = () => { setOrders([]); setPhone(""); setMode("browse"); setEditingId(null); setPendingItem(null); setPendingConfig(defaultConfig()); setPendingQty(1); setSelectedOrderId(null); setShowClearConfirm(false); setDiscount(null); };
+
+  // 客製化中即時同步到右側點單，不需按確認鍵
+  useEffect(() => {
+    if (mode !== "customize_edit" || !editingId || !pendingItem) return;
+    const unitTotal = calcUnitTotal(pendingItem, pendingConfig);
+    setOrders(p => p.map(o => o.id === editingId ? {
+      ...o,
+      sugar: pendingConfig.sugar,
+      ice: pendingConfig.ice,
+      toppings: [...pendingConfig.toppings],
+      doubleTopping: pendingConfig.doubleTopping,
+      extraOption: pendingConfig.extraOption,
+      unitTotal,
+      qty: pendingQty,
+    } : o));
+  }, [pendingConfig, pendingQty, mode, editingId]);
 
   const isCustomizing = mode==="customize_new"||mode==="customize_edit";
   const pendingUnitTotal = pendingItem?calcUnitTotal(pendingItem,pendingConfig):0;
@@ -416,10 +436,9 @@ function OrderApp() {
             <div style={{ flex:1,padding:"16px 18px",overflowY:"auto",display:"flex",flexDirection:"column",gap:16 }}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
                 <div>
-                  <div style={{ fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:3 }}>{pendingItem.noCustomize?"📦 更改數量":mode==="customize_edit"?"✏️ 修改品項":"➕ 新增品項"}</div>
+                  <div style={{ fontSize:11,color:C.muted,fontWeight:700,letterSpacing:1,marginBottom:3 }}>{pendingItem.noCustomize?"📦 更改數量":"✏️ 客製化"}</div>
                   <div style={{ fontSize:18,fontWeight:700,color:C.accentText }}>{pendingItem.name}</div>
                 </div>
-                <button onClick={handleCancelEdit} style={{ padding:"6px 12px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,cursor:"pointer",fontSize:12,color:C.muted }}>取消</button>
               </div>
               {/* 袋子：只顯示數量，其餘全跳過 */}
               {pendingItem.noCustomize&&(
@@ -432,9 +451,7 @@ function OrderApp() {
                       <button onClick={()=>setPendingQty(q=>q+1)} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accent,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>＋</button>
                     </div>
                   </div>
-                  <div style={{ display:"flex",justifyContent:"flex-end",borderTop:`1px solid ${C.border}`,paddingTop:14,marginTop:"auto" }}>
-                    <button onClick={handleSaveEdit} style={{ padding:"11px 24px",background:"#bc955c",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>儲存修改</button>
-                  </div>
+                  <button onClick={handleCancelEdit} style={{ padding:"10px",background:"transparent",border:`1.5px solid ${C.border}`,borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,color:C.muted }}>← 返回</button>
                 </>
               )}
               {!pendingItem.noCustomize&&<>
@@ -497,16 +514,13 @@ function OrderApp() {
                   <button onClick={()=>setPendingQty(q=>q+1)} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accentText,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>＋</button>
                 </div>
               </div>
+              <button onClick={handleCancelEdit} style={{ padding:"10px",background:"transparent",border:`1.5px solid ${C.border}`,borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,color:C.muted }}>← 返回</button>
               {/* Footer */}
-              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`,paddingTop:14,marginTop:"auto" }}>
-                <div>
+              <div style={{ display:"flex",justifyContent:"flex-end",alignItems:"center",borderTop:`1px solid ${C.border}`,paddingTop:14,marginTop:"auto" }}>
+                <div style={{ textAlign:"right" }}>
                   <div style={{ fontSize:11,color:C.muted }}>單杯小計</div>
                   <div style={{ fontSize:21,fontWeight:700,color:C.accentText }}>NT$ {pendingUnitTotal}</div>
                 </div>
-                {mode==="customize_new"
-                  ? <button onClick={handleAddOrder} style={{ padding:"11px 24px",background:C.accent,color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>加入點單</button>
-                  : <button onClick={handleSaveEdit} style={{ padding:"11px 24px",background:"#bc955c",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700 }}>儲存修改</button>
-                }
               </div>
             </>}
             </div>
