@@ -109,14 +109,12 @@ const MENU = {
     { name:"蘋果茶花烏龍", price:85, sugar:4, ice:"B" },
     { name:"蘋果春芽厚乳", price:79, sugar:4, ice:"B" },
   ]},
-  馥莓:{ items:[
+  新品:{ items:[
     { name:"馥莓冰茶", price:55, sugar:4, ice:"A" },
     { name:"紫蘇馥莓熟成", price:85, sugar:2, ice:"B", lockedTopping:{ name:"水玉", price:10 } },
     { name:"紫蘇馥莓冰茶", price:85, sugar:2, ice:"B" },
+    { name:"金蜜烏龍", price:73, sugar:5, ice:"A" },
     { name:"生茶白玉冰淇淋", price:69, noCustomize:true, pairPrice:109 },
-  ]},
-  聯名:{ items:[
-    { name:"柚檸紅茶", price:75, sugar:7, ice:"C", fixedSugar:true, fixedIce:true },
   ]},
   折扣:{ items:[
     { name:"員工折5元", price:0, discount:{ type:"per_cup", amount:5 }, noCustomize:true },
@@ -366,18 +364,25 @@ function OrderApp() {
   const pill = (active,disabled) => ({ padding:"7px 14px",borderRadius:20,cursor:disabled?"not-allowed":"pointer",fontSize:13,fontWeight:600,border:`1.5px solid ${disabled?C.disabled:active?C.accent:C.border}`,background:disabled?"#F0EDE9":active?C.accent:C.surface,color:disabled?C.disabledText:active?"#fff":C.text,opacity:disabled?0.6:1 });
   const chip = (active) => ({ display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 6px",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,gap:2,border:`1.5px solid ${active?C.accent:C.border}`,background:active?C.accentLight:C.surface,color:active?C.accentText:C.text });
 
-  const orderSummaryLine = (o) => {
-    if (o.itemRef?.noCustomize) return o.pairPrice&&o.qty>=2?`兩個 NT$${o.pairPrice}`:"";
-    const parts=[o.ice,o.sugar];
+  // 回傳 { base: "冰塊・甜度", topping: "＋加料" 或 "" }
+  const orderSummaryParts = (o) => {
+    if (o.itemRef?.noCustomize) return { base: o.pairPrice&&o.qty>=2?`兩個 NT$${o.pairPrice}`:"", topping:"" };
+    const baseParts=[o.ice,o.sugar];
+    if (o.extraOption&&o.itemRef?.extraOption) baseParts.push(o.itemRef.extraOption.name);
+    const base = baseParts.join("・");
     const extraToppings=o.toppings.filter(t=>t.name!==o.itemRef?.lockedTopping?.name);
+    let topping="";
     if (o.doubleTopping) {
       const dtt=extraToppings.length===1?extraToppings[0]:o.itemRef?.lockedTopping;
-      if (dtt) parts.push("＋"+dtt.name+" ×2");
+      if (dtt) topping="＋"+dtt.name+" ×2";
     } else if (extraToppings.length>0) {
-      parts.push("＋"+extraToppings.map(t=>t.name).join("、"));
+      topping="＋"+extraToppings.map(t=>t.name).join("、");
     }
-    if (o.extraOption&&o.itemRef?.extraOption) parts.push(o.itemRef.extraOption.name);
-    return parts.join("・");
+    return { base, topping };
+  };
+  const orderSummaryLine = (o) => {
+    const { base, topping } = orderSummaryParts(o);
+    return topping ? `${base}・${topping}` : base;
   };
 
   const receiptSummaryLine = (o) => {
@@ -396,16 +401,12 @@ function OrderApp() {
 
   return (
     <div style={{ height:"100vh",display:"flex",flexDirection:"column",fontFamily:"'PingFang TC','Noto Sans TC',sans-serif",color:C.text,background:C.bg,overflow:"hidden" }}>
-      <div style={{ background:C.accent,color:"#fff",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+      <div style={{ background:C.accent,color:"#fff",padding:"14px 20px",display:"flex",alignItems:"center",flexShrink:0 }}>
         <span style={{ fontSize:17,fontWeight:700,letterSpacing:2 }}>點餐系統</span>
-        <div style={{ textAlign:"right" }}>
-          <div style={{ fontSize:10,opacity:0.75,letterSpacing:1 }}>目前金額</div>
-          <div style={{ fontSize:20,fontWeight:700 }}>NT$ {total}</div>
-        </div>
       </div>
       <div style={{ display:"flex",flex:1,minHeight:0 }}>
         {/* LEFT */}
-        <div style={{ flex:1.5,display:"flex",flexDirection:"column",borderRight:`1px solid ${C.border}` }}>
+        <div style={{ flex:1.15,display:"flex",flexDirection:"column",borderRight:`1px solid ${C.border}` }}>
           {!isCustomizing && (<>
             <div style={{ display:"flex",borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0,flexWrap:"wrap" }}>
               {Object.keys(MENU).map(cat=>(
@@ -446,7 +447,7 @@ function OrderApp() {
                   <div style={{ borderTop:`1px solid ${C.border}`,paddingTop:12 }}>
                     <div style={{ fontSize:11,fontWeight:700,color:C.muted,letterSpacing:1,marginBottom:8 }}>數量</div>
                     <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                      <button onClick={()=>setPendingQty(q=>Math.max(1,q-1))} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accent,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>−</button>
+                      <button onClick={()=>{ if(pendingQty<=1){ removeOrder(editingId); } else { setPendingQty(q=>q-1); } }} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accent,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>−</button>
                       <input type="number" min="1" value={pendingQty} onFocus={e=>e.target.select()} onChange={e=>{ const v=parseInt(e.target.value); if(!isNaN(v)&&v>=1)setPendingQty(v); }} style={{ width:52,textAlign:"center",fontSize:16,fontWeight:700,border:`1.5px solid ${C.border}`,borderRadius:8,padding:"6px 0",outline:"none",color:C.text }} />
                       <button onClick={()=>setPendingQty(q=>q+1)} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accent,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>＋</button>
                     </div>
@@ -509,7 +510,7 @@ function OrderApp() {
               <div style={{ borderTop:`1px solid ${C.border}`,paddingTop:12 }}>
                 <div style={{ fontSize:11,fontWeight:700,color:C.muted,letterSpacing:1,marginBottom:8 }}>數量</div>
                 <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                  <button onClick={()=>setPendingQty(q=>Math.max(1,q-1))} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accentText,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>−</button>
+                  <button onClick={()=>{ if(pendingQty<=1){ removeOrder(editingId); } else { setPendingQty(q=>q-1); } }} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accentText,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>−</button>
                   <input type="number" min="1" value={pendingQty} onChange={e=>{ const v=parseInt(e.target.value); if(!isNaN(v)&&v>=1)setPendingQty(v); }} onFocus={e=>e.target.select()} style={{ width:52,textAlign:"center",fontSize:16,fontWeight:700,border:`1.5px solid ${C.border}`,borderRadius:8,padding:"6px 0",outline:"none",color:C.text }} />
                   <button onClick={()=>setPendingQty(q=>q+1)} style={{ width:34,height:34,borderRadius:"50%",background:C.surface,border:`1.5px solid ${C.border}`,cursor:"pointer",fontSize:18,color:C.accentText,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center" }}>＋</button>
                 </div>
@@ -547,17 +548,16 @@ function OrderApp() {
                     <span style={{ background:isSel?C.accent:C.muted,color:"#fff",borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0,marginTop:1 }}>{i+1}</span>
                     <div style={{ flex:1,minWidth:0 }}>
                       <div style={{ fontWeight:700,fontSize:13 }}>{o.item}</div>
-                      <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{orderSummaryLine(o)}</div>
-                      {isSel&&<div style={{ fontSize:11,color:C.accent,marginTop:3,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden" }}>← 點左側修改{o.itemRef?.noCustomize?"數量":"內容"}</div>}
+                      {(() => { const {base,topping}=orderSummaryParts(o); return (<>
+                        {base&&<div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{base}</div>}
+                        {topping&&<div style={{ fontSize:11,color:C.muted,marginTop:1 }}>{topping}</div>}
+                      </>); })()}
+
 
 
                     </div>
                     <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0 }}>
-                      <div onClick={e=>e.stopPropagation()} style={{ display:"flex",alignItems:"center",gap:4,background:isSel?C.accentLight:C.surface,border:`1.5px solid ${isSel?C.accent:C.border}`,borderRadius:20,padding:"2px 5px" }}>
-                        <button onClick={()=>changeQty(o.id,-1)} style={{ background:"transparent",border:"none",cursor:"pointer",fontSize:14,color:C.accentText,fontWeight:700,padding:"0 2px" }}>−</button>
-                        <span style={{ fontSize:12,fontWeight:700,minWidth:14,textAlign:"center" }}>{o.qty}</span>
-                        <button onClick={()=>changeQty(o.id,1)} style={{ background:"transparent",border:"none",cursor:"pointer",fontSize:14,color:C.accentText,fontWeight:700,padding:"0 2px" }}>＋</button>
-                      </div>
+                      <span style={{ fontSize:12,fontWeight:700,color:C.muted }}>× {o.qty}</span>
                       <span style={{ fontWeight:700,fontSize:13,color:C.accentText }}>NT$ {calcOrderAmount(o)}</span>
                       {o.qty>1&&!o.pairPrice&&<span style={{ fontSize:10,color:C.muted }}>單杯 {o.unitTotal}</span>}
                       {o.qty>1&&o.pairPrice&&<span style={{ fontSize:10,color:C.muted }}>兩個 {o.pairPrice}</span>}
